@@ -28,7 +28,7 @@ class FeatureExtractor:
             image = face_recognition.load_image_file(str(image_path))
             face_locations = face_recognition.face_locations(image)
             if not face_locations:
-                print(f"未检测到人脸，已跳过: {image_path.name}")
+                print(f"unrecognized face skiped! picture: {image_path.name}")
                 continue
 
             # 如果检测到多张人脸，选择最大的那一张
