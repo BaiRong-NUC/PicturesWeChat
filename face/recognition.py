@@ -1,6 +1,9 @@
 import face_recognition
 import cv2
 from .feature_extraction import FeatureExtractor
+from wechat.user import User
+import time
+import threading
 
 
 class FaceRecognition:
@@ -12,6 +15,7 @@ class FaceRecognition:
         frame_scale=0.5,
         process_every_n_frames=3,
         recognition_tolerance=0.6,
+        unknown_alert_interval=60,
     ):
         self.window_name = window_name
         self.user_features = FeatureExtractor(dataset_dir).user_features
@@ -21,8 +25,14 @@ class FaceRecognition:
         self.frame_scale = frame_scale
         self.process_every_n_frames = max(1, process_every_n_frames)
         self.recognition_tolerance = recognition_tolerance
+        self.unknown_alert_interval = unknown_alert_interval
         self.frame_index = 0
         self.last_recognition_results = []
+        self.last_unknown_alert_time = 0
+        self.is_sending_unknown_alert = False
+
+        # 用户
+        self.user = User(refresh_token=False)
 
     def close(self) -> bool:
         if self.video_capture is not None and self.video_capture.isOpened():
@@ -77,6 +87,28 @@ class FaceRecognition:
             (255, 255, 255),
             1,
         )
+
+    def notify_unknown_person(self, unknown_count=1):
+        now = time.monotonic()
+        if now - self.last_unknown_alert_time < self.unknown_alert_interval:
+            return
+        if self.is_sending_unknown_alert:
+            return
+
+        self.last_unknown_alert_time = now
+        detected_time = time.strftime("%Y-%m-%d %H:%M:%S")
+        message = f"Unknown person detected at {detected_time}"
+        if unknown_count > 1:
+            message = f"{unknown_count} unknown people detected at {detected_time}"
+
+        def send_alert():
+            self.is_sending_unknown_alert = True
+            try:
+                self.user.send_message(message)
+            finally:
+                self.is_sending_unknown_alert = False
+
+        threading.Thread(target=send_alert, daemon=True).start()
 
     @staticmethod
     def scale_face_location(face_location, scale):
@@ -148,6 +180,13 @@ class FaceRecognition:
 
             if self.frame_index % self.process_every_n_frames == 0:
                 self.last_recognition_results = self.recognize_frame(frame)
+                unknown_count = sum(
+                    1
+                    for _, recognized_user in self.last_recognition_results
+                    if recognized_user is None
+                )
+                if unknown_count > 0:
+                    self.notify_unknown_person(unknown_count)
             self.frame_index += 1
 
             for face_location, recognized_user in self.last_recognition_results:

@@ -74,3 +74,5 @@ class User:
                 f"Failed to send message after refreshing access_token, error code: {errcode}, error message: {error_message}"
             )
             return False
+
+        return False
