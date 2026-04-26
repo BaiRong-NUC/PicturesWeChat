@@ -1,4 +1,4 @@
-from user import User
+from wechat.user import User
 
 if __name__ == "__main__":
     user = User(refresh_token=False)

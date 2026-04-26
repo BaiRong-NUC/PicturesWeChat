@@ -2,7 +2,7 @@ import json
 import requests
 import os
 from dotenv import load_dotenv
-from message import Message
+from wechat.message import Message
 
 
 class TokenInfo:
