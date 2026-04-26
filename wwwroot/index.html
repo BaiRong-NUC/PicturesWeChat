@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>陌生人脸告警</title>
+        <link rel="stylesheet" href="/css/styles.css" />
+        <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    </head>
+    <body>
+        <div id="app">
+            <header>
+                <h1>
+                    陌生人脸告警
+                    <span class="badge" v-if="events.length"
+                        >{{ events.length }}</span
+                    >
+                </h1>
+                <div class="stats">
+                    <span v-if="lastUpdated">最后刷新: {{ lastUpdated }}</span>
+                    <div class="toolbar">
+                        <button @click="fetchEvents">刷新</button>
+                        <button
+                            class="danger"
+                            @click="clearAll"
+                            :disabled="!events.length"
+                        >
+                            清空
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main>
+                <div v-if="loading && !events.length" class="empty">
+                    加载中...
+                </div>
+                <div v-else-if="!events.length" class="empty">
+                    暂无陌生人记录
+                </div>
+                <div v-else class="grid">
+                    <div
+                        class="card"
+                        v-for="evt in events"
+                        :key="evt.id"
+                        @click="preview = evt"
+                    >
+                        <img
+                            :src="evt.image"
+                            :alt="evt.timestamp"
+                            loading="lazy"
+                        />
+                        <div class="card-body">
+                            <div class="card-time">{{ evt.timestamp }}</div>
+                            <div class="card-meta">
+                                <span>陌生人数: {{ evt.unknown_count }}</span>
+                                <span>#{{ evt.id.slice(0, 6) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <div v-if="preview" class="modal-mask" @click.self="preview = null">
+                <div class="modal">
+                    <img :src="preview.image" :alt="preview.timestamp" />
+                    <div class="info">
+                        <div>时间: {{ preview.timestamp }}</div>
+                        <div>陌生人数: {{ preview.unknown_count }}</div>
+                        <div>事件 ID: {{ preview.id }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="/js/app.js"></script>
+    </body>
+</html>

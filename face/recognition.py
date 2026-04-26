@@ -1,9 +1,13 @@
+import os
+import time
+import threading
+import uuid
+from pathlib import Path
+
 import face_recognition
 import cv2
 from .feature_extraction import FeatureExtractor
 from wechat.user import User
-import time
-import threading
 
 
 class FaceRecognition:
@@ -16,6 +20,9 @@ class FaceRecognition:
         process_every_n_frames=3,
         recognition_tolerance=0.6,
         unknown_alert_interval=60,
+        event_store=None,
+        snapshot_dir=None,
+        snapshot_url_prefix="snapshots",
     ):
         self.window_name = window_name
         self.user_features = FeatureExtractor(dataset_dir).user_features
@@ -30,6 +37,12 @@ class FaceRecognition:
         self.last_recognition_results = []
         self.last_unknown_alert_time = 0
         self.is_sending_unknown_alert = False
+
+        self.event_store = event_store
+        self.snapshot_dir = Path(snapshot_dir) if snapshot_dir else None
+        if self.snapshot_dir is not None:
+            self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+        self.snapshot_url_prefix = snapshot_url_prefix.strip("/")
 
         # 用户
         self.user = User(refresh_token=False)
@@ -88,7 +101,25 @@ class FaceRecognition:
             1,
         )
 
-    def notify_unknown_person(self, unknown_count=1):
+    def save_snapshot(self, frame):
+        if self.snapshot_dir is None or frame is None:
+            return None
+        filename = f"{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.jpg"
+        file_path = self.snapshot_dir / filename
+        try:
+            ok = cv2.imwrite(str(file_path), frame)
+        except cv2.error as err:
+            print(f"Failed to save snapshot: {err}")
+            return None
+        if not ok:
+            return None
+        return (
+            f"/{self.snapshot_url_prefix}/{filename}"
+            if self.snapshot_url_prefix
+            else f"/{filename}"
+        )
+
+    def notify_unknown_person(self, unknown_count=1, frame=None):
         now = time.monotonic()
         if now - self.last_unknown_alert_time < self.unknown_alert_interval:
             return
@@ -100,6 +131,17 @@ class FaceRecognition:
         message = f"Unknown person detected at {detected_time}"
         if unknown_count > 1:
             message = f"{unknown_count} unknown people detected at {detected_time}"
+
+        snapshot_url = self.save_snapshot(frame)
+        if self.event_store is not None:
+            try:
+                self.event_store.add_event(
+                    timestamp=detected_time,
+                    unknown_count=unknown_count,
+                    image_path=snapshot_url or "",
+                )
+            except Exception as err:  # noqa: BLE001
+                print(f"Failed to record stranger event: {err}")
 
         def send_alert():
             self.is_sending_unknown_alert = True
@@ -186,7 +228,12 @@ class FaceRecognition:
                     if recognized_user is None
                 )
                 if unknown_count > 0:
-                    self.notify_unknown_person(unknown_count)
+                    annotated = frame.copy()
+                    for face_location, recognized_user in self.last_recognition_results:
+                        self.draw_recognition_result(
+                            annotated, face_location, recognized_user
+                        )
+                    self.notify_unknown_person(unknown_count, frame=annotated)
             self.frame_index += 1
 
             for face_location, recognized_user in self.last_recognition_results:
