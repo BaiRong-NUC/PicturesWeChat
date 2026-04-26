@@ -9,8 +9,9 @@ class FaceRecognition:
         dataset_dir,
         video_source=0,
         window_name="Video",
-        frame_scale=0.25,
+        frame_scale=0.5,
         process_every_n_frames=3,
+        recognition_tolerance=0.6,
     ):
         self.window_name = window_name
         self.user_features = FeatureExtractor(dataset_dir).user_features
@@ -19,6 +20,7 @@ class FaceRecognition:
         self.video_capture = cv2.VideoCapture(video_source)
         self.frame_scale = frame_scale
         self.process_every_n_frames = max(1, process_every_n_frames)
+        self.recognition_tolerance = recognition_tolerance
         self.frame_index = 0
         self.last_recognition_results = []
 
@@ -93,7 +95,7 @@ class FaceRecognition:
         matches = face_recognition.compare_faces(
             self.known_user_features,
             face_encoding,
-            tolerance=0.5,
+            tolerance=self.recognition_tolerance,
         )
         if not any(matches):
             return None
