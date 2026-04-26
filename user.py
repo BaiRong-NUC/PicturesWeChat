@@ -22,8 +22,8 @@ class TokenInfo:
 
 
 class User:
-    def __init__(self):
-        self.token_info = TokenInfo()
+    def __init__(self, refresh_token=False):
+        self.token_info = TokenInfo(refresh=refresh_token)
         self.message = Message(self.token_info.access_token, self.token_info.user_id)
 
     def send_message(self, content):
